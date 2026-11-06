@@ -64,18 +64,19 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
 <script type="module">
 import * as THREE from 'three';
 
-/* ── Assets: motionsites.ai design previews, used by their own preview links ── */
+/* ── Assets: motionsites.ai design preview videos (their own links), with the preview image as poster ── */
 const MS = id => `https://images.higgs.ai/?default=1&output=webp&url=https%3A%2F%2Fd8j0ntlcm91z4.cloudfront.net%2Fuser_38xzZboKViGWJOttwIXH07lWA1P%2F${id}.png&w=1280&q=85`;
+const MV = p => `https://pub-86dc5b5484314368ac5436a674b0d919.r2.dev/${p}.mp4`;
 // one card per design; card aspects are the reference's own, in its order (each preview is cover-cropped)
 const CARDS = [
-  { t: 'Living Portrait', src: MS('hf_20261031_044539_b7fde132-8c25-4dda-ab05-4e4be99bf3d3'), a: 1.745 },
-  { t: 'Moss Island',     src: MS('hf_20261106_032528_99eb9a00-a553-40b6-8b97-017e918971c6'), a: 1.700 },
-  { t: 'Flower Valley',   src: MS('hf_20261103_061637_11907771-15ce-494b-81a4-9051861d6ce5'), a: 1.735 },
-  { t: 'Runway Lookbook', src: MS('hf_20261102_044911_1ad79156-a8dc-475a-8891-8408a9b61320'), a: 1.837 },
-  { t: 'Shelf Hero',      src: MS('hf_20261029_012401_8f947ed0-7b82-47d6-bdcd-b1ce1af0bf5f'), a: 1.526 },
-  { t: 'Solar Fog',       src: MS('hf_20261102_041507_8e9c2d22-8be2-4652-8bbe-1f4556ea463a'), a: 1.658 },
-  { t: 'Honey Bee',       src: MS('hf_20261017_154537_1384fa6d-282d-46e2-8748-a70be1cf681a'), a: 1.330 },
-  { t: 'Spider Web',      src: MS('hf_20261104_020746_7eebb7cf-e21b-4288-8211-0cb9d0728f48'), a: 1.610 },
+  { t: 'Living Portrait', vid: MV('aaaf/living-portrait-hero'),          src: MS('hf_20261031_044539_b7fde132-8c25-4dda-ab05-4e4be99bf3d3'), a: 1.745 },
+  { t: 'Moss Island',     vid: MV('aaaf/mossline-hero'),                 src: MS('hf_20261106_032528_99eb9a00-a553-40b6-8b97-017e918971c6'), a: 1.700 },
+  { t: 'Flower Valley',   vid: MV('aaaf/fernhollow'),                    src: MS('hf_20261103_061637_11907771-15ce-494b-81a4-9051861d6ce5'), a: 1.735 },
+  { t: 'Runway Lookbook', vid: MV('aaaf/vell-lookbook'),                 src: MS('hf_20261102_044911_1ad79156-a8dc-475a-8891-8408a9b61320'), a: 1.837 },
+  { t: 'Shelf Hero',      vid: MV('aaaf/vasari-vhs-hero'),               src: MS('hf_20261029_012401_8f947ed0-7b82-47d6-bdcd-b1ce1af0bf5f'), a: 1.526 },
+  { t: 'Solar Fog',       vid: MV('aaaf/lumen-roof-hero'),               src: MS('hf_20261102_041507_8e9c2d22-8be2-4652-8bbe-1f4556ea463a'), a: 1.658 },
+  { t: 'Honey Bee',       vid: MV('designs/honey-bee-melli-landing'),    src: MS('hf_20261017_154537_1384fa6d-282d-46e2-8748-a70be1cf681a'), a: 1.330 },
+  { t: 'Spider Web',      vid: MV('aaaf/found-spider'),                  src: MS('hf_20261104_020746_7eebb7cf-e21b-4288-8211-0cb9d0728f48'), a: 1.610 },
 ];
 
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -192,7 +193,9 @@ void main(){
 }`;
 
 const CARD_FS = `
-uniform sampler2D u_texture;
+uniform sampler2D u_texture;  // the media: preview image, then the preview video
+uniform sampler2D u_overlay;  // caption + pill, transparent
+uniform vec4 u_crop;          // cover crop of the media: offset.xy, scale.zw
 uniform vec2 u_res;
 uniform float u_alpha, u_shade, u_shadeS, u_corner;
 varying vec2 vUv;
@@ -212,7 +215,9 @@ float roundedBox(vec2 p, vec2 mid, float r){
   return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - r;
 }
 void main(){
-  vec4 tex = texture2D(u_texture, vUv);
+  vec4 tex = texture2D(u_texture, u_crop.xy + vUv * u_crop.zw);
+  vec4 ov = texture2D(u_overlay, vUv);
+  tex.rgb = mix(tex.rgb, ov.rgb, ov.a);
   if (u_shade > 0.001){
     float depth = sheetShade(vFlat.x, vUv, u_res.y);
     tex.rgb = mix(tex.rgb, vec3(0.059), u_shade * 0.8 * pow(depth, u_shadeS));
@@ -324,7 +329,7 @@ scene.add(floor);
 const cards = CARDS.map((c, i) => {
   const mat = new THREE.ShaderMaterial({
     vertexShader: CARD_VS, fragmentShader: CARD_FS, transparent: true, depthTest: false, depthWrite: false,
-    uniforms: { u_texture: { value: null }, u_res: { value: new THREE.Vector2(1, 1) }, u_alpha: { value: 0 },
+    uniforms: { u_texture: { value: null }, u_overlay: { value: null }, u_crop: { value: new THREE.Vector4(0, 0, 1, 1) }, u_res: { value: new THREE.Vector2(1, 1) }, u_alpha: { value: 0 },
       u_shade: { value: 1 }, u_shadeS: { value: SPREAD }, u_corner: { value: 0.049 }, ...sheetUniforms() },
   });
   mat.extensions = { derivatives: true };
@@ -386,27 +391,63 @@ function layout() {
   if (imgs.length) cards.forEach(paint);
 }
 
-/* each card's texture: cover crop of its preview + caption + pill, drawn at 2x */
+/* media: the preview image first, swapped for the preview video once it has a frame */
+function setMedia(c, tex, mw, mh) {
+  c.mat.uniforms.u_texture.value = tex;
+  c.mw = mw; c.mh = mh;
+  crop(c);
+}
+// cover crop of the media into the card's shape, as UV offset + scale
+function crop(c) {
+  if (!c.mw) return;
+  const ma = c.mw / c.mh;
+  let sx = 1, sy = 1;
+  if (c.a > ma) sy = ma / c.a; else sx = c.a / ma;
+  c.mat.uniforms.u_crop.value.set((1 - sx) / 2, (1 - sy) / 2, sx, sy);
+}
+function initMedia(c, img) {
+  const t = new THREE.Texture(img);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); t.needsUpdate = true;
+  setMedia(c, t, img.naturalWidth, img.naturalHeight);
+  if (reduce) return; // reduced motion keeps the still preview
+  const v = document.createElement('video');
+  v.crossOrigin = 'anonymous'; v.muted = true; v.defaultMuted = true; v.loop = true; v.playsInline = true;
+  v.setAttribute('playsinline', ''); v.setAttribute('muted', ''); v.preload = 'auto';
+  v.src = c.vid;
+  c.video = v;
+  const swap = () => {
+    if (c.vtex) return;
+    c.vtex = new THREE.VideoTexture(v);
+    c.vtex.colorSpace = THREE.SRGBColorSpace;
+    setMedia(c, c.vtex, v.videoWidth, v.videoHeight);
+  };
+  // first decoded frame → swap (requestVideoFrameCallback where available)
+  if ('requestVideoFrameCallback' in v) v.requestVideoFrameCallback(swap); else v.addEventListener('playing', swap, { once: true });
+}
+// play only the cards on or near the screen
+function syncPlayback(c, onScreen) {
+  const v = c.video;
+  if (!v) return;
+  if (onScreen && !document.hidden) { if (v.paused) v.play().catch(() => {}); }
+  else if (!v.paused) v.pause();
+}
+
+/* each card's overlay: caption + pill on a transparent canvas, drawn at 2x */
 function paint(c) {
-  const img = imgs[c.i];
-  if (!img) return;
   const s = 2 * Math.min(devicePixelRatio, 2) / 1.5;
   const cw = Math.round(c.w * s), ch = Math.round(c.h * s);
   const cv = c.cv || (c.cv = document.createElement('canvas'));
   cv.width = cw; cv.height = ch;
   const g = cv.getContext('2d');
-  const qw = img.naturalWidth, qh = img.naturalHeight, qa = qw / qh;
-  let sw = qw, sh = qh;
-  if (c.a > qa) sh = qw / c.a; else sw = qh * c.a;
-  const sx = (qw - sw) / 2, sy = (qh - sh) / 2;
-  g.drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
+  g.clearRect(0, 0, cw, ch);
+  crop(c);
   // caption: 18u desktop / 16u phone, tracking -0.05em, bottom 10u, inset-x 20u desktop / 10u phone
   const u = U * s, fs = (small ? 16 : 18) * u, ix = (small ? 10 : 20) * u;
   g.fillStyle = '#fff';
   g.font = `400 ${fs}px "Inter Tight", sans-serif`;
   g.textBaseline = 'alphabetic';
   if ('letterSpacing' in g) g.letterSpacing = `${-0.05 * fs}px`;
-  g.shadowColor = 'rgba(0,0,0,.25)'; g.shadowBlur = 8 * u;
+  g.shadowColor = 'rgba(0,0,0,.5)'; g.shadowBlur = 12 * u; // keeps the caption legible over bright video frames
   g.fillText(c.t, ix, ch - 10 * u - fs * 0.22);
   g.shadowBlur = 0;
   // the pill: 25u black circle, + on desktop, → on the phone
@@ -425,7 +466,7 @@ function paint(c) {
     c.tex.colorSpace = THREE.SRGBColorSpace;
     c.tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     c.tex.minFilter = THREE.LinearMipmapLinearFilter;
-    c.mat.uniforms.u_texture.value = c.tex;
+    c.mat.uniforms.u_overlay.value = c.tex;
   } else { c.tex.image = cv; c.tex.needsUpdate = true; }
 }
 
@@ -516,6 +557,7 @@ function frame(now) {
       let y = c.base - current;
       y = ((y - top) % L + L) % L + top;
       c.mesh.position.set(0, -(y + c.h / 2 - vh / 2) * k, 0);
+      syncPlayback(c, y + c.h > -0.5 * vh && y < 1.5 * vh);
     }
   } else {
     // the looping row
@@ -524,6 +566,7 @@ function frame(now) {
       let x = c.base - current;
       x = ((x - left) % L + L) % L + left;
       c.mesh.position.set((x + c.w / 2 - vw / 2) * k, 0, 0);
+      syncPlayback(c, x + c.w > -0.5 * vw && x < 1.5 * vw);
     }
   }
 
@@ -578,10 +621,13 @@ requestAnimationFrame(frame);
 const fail = setTimeout(() => document.body.classList.add('ready'), 8000); // failsafe
 Promise.all([document.fonts.load('400 18px "Inter Tight"'), ...CARDS.map(c => loadImg(c.src))]).then(([, ...im]) => {
   imgs.push(...im);
+  cards.forEach((c, i) => initMedia(c, im[i]));
   cards.forEach(paint);
   loaded = true; clearTimeout(fail);
   document.body.classList.add('ready');
 }).catch(() => document.body.classList.add('ready'));
+// resume visible videos when the tab comes back (browsers pause hidden ones)
+document.addEventListener('visibilitychange', () => { if (document.hidden) cards.forEach(c => c.video && c.video.pause()); });
 window.__hero = { cards, get current() { return current; }, set target(v) { target = v; current = v; } };
 </script>
 </body>
