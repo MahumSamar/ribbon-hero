@@ -64,22 +64,18 @@ canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
 <script type="module">
 import * as THREE from 'three';
 
-/* ── Assets: direct Higgsfield result links through images.higgs.ai ── */
-const hx = (u, w = 2048) => `https://images.higgs.ai/?default=1&output=webp&url=${encodeURIComponent(u)}&w=${w}&q=85`;
-const SHEETS = [
-  hx('https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261105_170136_44140e8d-ab4a-461a-9189-24ba32ccb740.png'),
-  hx('https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20261105_170137_264f1ce2-677c-4fcf-ad6c-d3df836e5381.png'),
-];
-// sheet, quadrant column/row, card aspect (the reference's own aspect ratios, in its order)
+/* ── Assets: motionsites.ai design previews, used by their own preview links ── */
+const MS = id => `https://images.higgs.ai/?default=1&output=webp&url=https%3A%2F%2Fd8j0ntlcm91z4.cloudfront.net%2Fuser_38xzZboKViGWJOttwIXH07lWA1P%2F${id}.png&w=1280&q=85`;
+// one card per design; card aspects are the reference's own, in its order (each preview is cover-cropped)
 const CARDS = [
-  { t: 'Villa Serena',      s: 0, c: 0, r: 0, a: 1.745 },
-  { t: 'Aurel Typeface',    s: 0, c: 1, r: 0, a: 1.700 },
-  { t: 'Soft Horizon',      s: 0, c: 0, r: 1, a: 1.735 },
-  { t: 'The Launch Window', s: 0, c: 1, r: 1, a: 1.837 },
-  { t: 'Night Static',      s: 1, c: 0, r: 0, a: 1.526 },
-  { t: 'Forma Ceramic',     s: 1, c: 0, r: 1, a: 1.658 },
-  { t: 'Verdant Falls',     s: 1, c: 1, r: 0, a: 1.330 },
-  { t: 'Saturna',           s: 1, c: 1, r: 1, a: 1.610 },
+  { t: 'Living Portrait', src: MS('hf_20261031_044539_b7fde132-8c25-4dda-ab05-4e4be99bf3d3'), a: 1.745 },
+  { t: 'Moss Island',     src: MS('hf_20261106_032528_99eb9a00-a553-40b6-8b97-017e918971c6'), a: 1.700 },
+  { t: 'Flower Valley',   src: MS('hf_20261103_061637_11907771-15ce-494b-81a4-9051861d6ce5'), a: 1.735 },
+  { t: 'Runway Lookbook', src: MS('hf_20261102_044911_1ad79156-a8dc-475a-8891-8408a9b61320'), a: 1.837 },
+  { t: 'Shelf Hero',      src: MS('hf_20261029_012401_8f947ed0-7b82-47d6-bdcd-b1ce1af0bf5f'), a: 1.526 },
+  { t: 'Solar Fog',       src: MS('hf_20261102_041507_8e9c2d22-8be2-4652-8bbe-1f4556ea463a'), a: 1.658 },
+  { t: 'Honey Bee',       src: MS('hf_20261017_154537_1384fa6d-282d-46e2-8748-a70be1cf681a'), a: 1.330 },
+  { t: 'Spider Web',      src: MS('hf_20261104_020746_7eebb7cf-e21b-4288-8211-0cb9d0728f48'), a: 1.610 },
 ];
 
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -390,19 +386,19 @@ function layout() {
   if (imgs.length) cards.forEach(paint);
 }
 
-/* each card's texture: cover crop of its quadrant + caption + plus button, drawn at 2x */
+/* each card's texture: cover crop of its preview + caption + pill, drawn at 2x */
 function paint(c) {
-  const img = imgs[c.s];
+  const img = imgs[c.i];
   if (!img) return;
   const s = 2 * Math.min(devicePixelRatio, 2) / 1.5;
   const cw = Math.round(c.w * s), ch = Math.round(c.h * s);
   const cv = c.cv || (c.cv = document.createElement('canvas'));
   cv.width = cw; cv.height = ch;
   const g = cv.getContext('2d');
-  const qw = img.naturalWidth / 2, qh = img.naturalHeight / 2, qa = qw / qh;
+  const qw = img.naturalWidth, qh = img.naturalHeight, qa = qw / qh;
   let sw = qw, sh = qh;
   if (c.a > qa) sh = qw / c.a; else sw = qh * c.a;
-  const sx = c.c * qw + (qw - sw) / 2, sy = c.r * qh + (qh - sh) / 2;
+  const sx = (qw - sw) / 2, sy = (qh - sh) / 2;
   g.drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
   // caption: 18u desktop / 16u phone, tracking -0.05em, bottom 10u, inset-x 20u desktop / 10u phone
   const u = U * s, fs = (small ? 16 : 18) * u, ix = (small ? 10 : 20) * u;
@@ -580,7 +576,7 @@ layout();
 addEventListener('resize', () => { clearTimeout(layout.t); layout.t = setTimeout(layout, 100); });
 requestAnimationFrame(frame);
 const fail = setTimeout(() => document.body.classList.add('ready'), 8000); // failsafe
-Promise.all([document.fonts.load('400 18px "Inter Tight"'), ...SHEETS.map(loadImg)]).then(([, ...im]) => {
+Promise.all([document.fonts.load('400 18px "Inter Tight"'), ...CARDS.map(c => loadImg(c.src))]).then(([, ...im]) => {
   imgs.push(...im);
   cards.forEach(paint);
   loaded = true; clearTimeout(fail);
